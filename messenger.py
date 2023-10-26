@@ -23,8 +23,11 @@ class MessengerClient:
         self.server_encryption_pk = server_encryption_pk
         self.conns = {}
         self.certs = {}
+        self.secret_key = None
+        
 
     def generateCertificate(self):
+
         raise Exception("not implemented!")
         return
 
@@ -43,3 +46,10 @@ class MessengerClient:
     def report(self, name, message):
         raise Exception("not implemented!")
         return
+
+
+class Certificate:
+    
+    def __init__(self, publicKey, userName):
+        self.name = userName
+        self.publicKey = publicKey
