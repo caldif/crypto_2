@@ -27,6 +27,11 @@ self.conns is to store lists of conversations
 **Decryption**
 - Performs a symmetric-key ratchet step to derive the relevant message key and next chain key, and decrypts the message.
 - Message headers should be authenticated
+
+**Libraries**
+- pickle
+- cryptography
+
 **Function Usage Recommendations**
 
 GENERATE_DH(): This function is recommended to generate a key pair based on the Curve25519 or Curve448 elliptic curves [7].
