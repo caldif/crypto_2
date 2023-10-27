@@ -6,7 +6,11 @@
 6. need to have a number of old keys stored
 7. root key, send key, receieve key, DH key, server verification key, and one more 
 
-When name changes, you make a new DH
+**When HEADER changes, you make a new DH**
+- Every message from either party begins with a header which contains the sender's current ratchet public key. When a new ratchet public key is received from the remote party, a DH ratchet step is performed which replaces the local party's current ratchet key pair with a new key pair.
+
+
+**DISCARD OLD KEYS WHEN A RATCHET OCCURS**
 
 self.conns is to store lists of conversations
 - store conversations by storing their respective keys
@@ -15,6 +19,14 @@ self.conns is to store lists of conversations
 - we manage crypto for server
 - we don't need to store our certificate but we are storing everyone we can talk to's certificate
 
+**Abuse Report**
+- encrypt the name of the sender and the message under the **messaging server's** public key, send it to the server
+**Encryption**
+- Message headers should be authenticated
+
+**Decryption**
+- Performs a symmetric-key ratchet step to derive the relevant message key and next chain key, and decrypts the message.
+- Message headers should be authenticated
 **Function Usage Recommendations**
 
 GENERATE_DH(): This function is recommended to generate a key pair based on the Curve25519 or Curve448 elliptic curves [7].
