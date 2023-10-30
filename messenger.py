@@ -26,12 +26,18 @@ class MessengerClient:
         self.name = name
         self.server_signing_pk = server_signing_pk
         self.server_encryption_pk = server_encryption_pk
-        self.conns = {}
+        self.conns = {}  
+        self.friends = dict[str, Keys] = {} #dict of {name, Keys(pk, mk, root, ck)}
         self.certs = {}
         self.sending = {} #stores name of person talking to with a boolean of whether you sent the last message (true if it was you)
         self.private_key = None
+        
+        #These need to be fixed because there's one for each convo
         self.mk = None
         self.root = None
+        self.chain = None
+
+        #Need to save each root and chain for each person 
         
 
     def generateCertificate(self):
@@ -50,25 +56,28 @@ class MessengerClient:
             self.sending[name] = True
             # DH ratchet and symm 
 
-            self.root, public_key = self.dhRatchet(self.certs[name][1], self.certs[name][0])
+            self.friends[name].rk, self.friends[name].ck, my_public_key = self.dhRatchet(self.certs[name][1], self.certs[name][0])
 
 
-            self.mk = self.symmRatchet(self.root)
+            self.friends[name].ck, self.friends[name].mk = self.symmRatchet(self.root)
 
-            #encrypt
+            #encrypt the message with the resulting message key (mk)
+
+            #my public key should go in the header 
+
 
             return
         elif self.sending[name] is False:
             self.sending[name] = True
-            self.root, public_key = self.dhRatchet(self.conns[name], self.root)
-            self.mk = self.symmRatchet(self.root)
+            self.friends[name].rk, my_public_key = self.dhRatchet(self.friends[name].pk, self.friends[name].rk)
+            self.friends[name].ck, self.friends[name].mk = self.symmRatchet(self.root)
 
             #encrypt
             return
             #DH ratchet and symm
         else:
             #NO DH ratchet, but symm ratchet
-            self.mk = self.symmRatchet(self.mk)
+            self.friends[name].ck, self.friends[name].mk = self.symmRatchet(self.mk)
 
             #encrypt
             return
@@ -79,6 +88,7 @@ class MessengerClient:
         self.conns[name] = header #loading this in 
         
         #first check if we were receiving before, if not them self.sending[name] = False ELSE don't change it because it's already false
+
         raise Exception("not implemented!")
         return
 
@@ -94,22 +104,27 @@ class MessengerClient:
         dh_out = self.private_key.exchange(ec.ECDH(), pubkey)
 
         #Key Derive
-        derived_key = HKDF(hashes.SHA256(),32, root, b'dh ratchet').derive(dh_out)
-
-        return derived_key, public_key
+        key_der = HKDF(hashes.SHA256(),64, root, b'root key').derive(dh_out)
+        
+        root_key = key_der[63:32]
+        chain_key = key_der[31:0]
+        
+        return root_key, chain_key, public_key
 
     def symmRatchet(self, chain_key):
         h = hmac.HMAC(chain_key, hashes.SHA256())
 
-        h.update("symmetric ratchet")
+        h.update("0x02")
 
-        signature = h.finalize()
+        new_chain = h.finalize()
 
-        return signature
+        j = hmac.HMAC(chain_key, hashes.SHA256())
 
+        j.update("0x01")
 
+        new_message = j.finalize()
 
-
+        return new_chain, new_message
 
 
 
@@ -118,3 +133,11 @@ class Certificate:
     def __init__(self, publicKey, userName):
         self.name = userName
         self.publicKey = publicKey
+
+class Keys:
+    
+    def __init__(self, publicKey, chainKey, messageKey, rootKey):
+        self.pk = publicKey
+        self.ck = chainKey
+        self.mk = messageKey
+        self.rk = rootKey
