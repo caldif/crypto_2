@@ -98,9 +98,9 @@ class MessengerClient:
         if name not in self.sending:
             self.sending[name] = False
             # DH ratchet and symm 
-            rk, ck, my_pk = self.dhRatchet(self.certs[name][1], self.certs[name][0]) #we dont use the first one
+            rk, ck, my_pk = self.dhRatchet(header.pk, self.certs[name][0]) #we dont use the first one
             ck, mk = self.symmRatchet(rk)
-            self.conns[name] = Keys(self.certs[name][1],ck,mk,rk,my_pk)
+            self.conns[name] = Keys(header.pk,ck,mk,rk,my_pk)
         
         elif self.sending[name] == True:
             self.sending[name] = False
