@@ -13,10 +13,18 @@ class MessengerServer:
         self.server_decryption_key = server_decryption_key
 
     def decryptReport(self, ct):
-        raise Exception("not implemented!")
-        return
+        nonce, u, cipher_text = ct
+        v = self.server_decryption_key.exchange(ec.ECDH(), u)
+        h = hashes.Hash(hashes.SHA256())
+        h.update(u.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+        h.update(v)
+        k = h.finalize()
+        a = AESGCM(k)
+        message = a.decrypt(nonce=bytes(str(nonce), 'ascii'), data=cipher_text, associated_data=None)
+        return str(message,encoding='utf-8')
 
     def signCert(self, cert):
+        
         ecdsa = ec.ECDSA(hashes.SHA256())
         sig = self.server_signing_key.sign(pickle.dumps(cert), ecdsa)
         return sig
@@ -37,6 +45,7 @@ class MessengerClient:
         self.root = None
         self.chain = None
         self.counter = 2**64
+        self.reoprt_counter = 2**64
 
 
         #Need to save each root and chain for each person 
@@ -99,9 +108,7 @@ class MessengerClient:
         a = AESGCM(self.conns[name].mk)
         c = a.encrypt(nonce=bytes(str(self.counter), 'ascii'), data=bytes(message, 'ascii'), associated_data=self.conns[name].my_pubk.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
         
-        return head, c
-        
-        
+        return head, c 
 
     def receiveMessage(self, name, header, ciphertext):
 
@@ -147,8 +154,22 @@ class MessengerClient:
         #first check if we were receiving before, if not them self.sending[name] = False ELSE don't change it because it's already false
 
     def report(self, name, message):
-        raise Exception("not implemented!")
-        return
+        y = ec.generate_private_key(ec.SECP256R1())
+        u = y.public_key()
+        v = y.exchange(ec.ECDH(), self.server_encryption_pk)
+        h = hashes.Hash(hashes.SHA256())
+        h.update(u.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+        h.update(v)
+        k = h.finalize()
+
+        a = AESGCM(k)
+        concated = name + message
+        ct = a.encrypt(nonce=bytes(str(self.reoprt_counter), "ascii"), data=bytes(concated, 'ascii'), associated_data=None)
+        out = (self.reoprt_counter, u, ct)
+        self.reoprt_counter += 1
+
+    
+        return concated, out
     
     def dhRatchet(self, root, dh_out):
         #Key Derive
