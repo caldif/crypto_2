@@ -57,45 +57,39 @@ class MessengerClient:
         if name not in self.conns: 
             self.sending[name] = True
 
-            dh_out = self.private_key.exchange(ec.ECDH(), self.certs[name][1])
+            dh_out = self.certs[name][0]
 
             rk, ck = self.dhRatchet(dh_out, dh_out)
 
             ck, mk = self.symmRatchet(ck)
 
-            self.conns[name] = Keys(self.certs[name][1],ck,mk,rk,self.private_key, self.private_key.public_key())
-
-        #this is old stuff, above is me restructuring
-        if name not in self.conns: 
-            self.sending[name] = True
-            # DH ratchet and symm 
-
-            rk, ck, my_pubk, my_privk = self.dhRatchet(self.certs[name][1], self.certs[name][0]) #we dont use the first one
+            self.conns[name] = Keys(self.certs[name][1],ck,mk,rk, self.private_key.public_key(),self.private_key)
 
 
-            ck, mk = self.symmRatchet(rk)
-            self.conns[name] = Keys(self.certs[name][1],ck,mk,rk,my_pubk, my_privk)
-
-            #encrypt the message with the resulting message key (mk)
-
-            #my public key should go in the header             
+        #     #my public key should go in the header             
         elif self.sending[name] is False:
             self.sending[name] = True
 
             #about to send a message so need new key pair
             private_key = ec.generate_private_key(ec.SECP256K1())
             public_key = private_key.public_key()
+            self.conns[name].my_pubk = public_key
+            self.conns[name].my_privk = private_key
 
+            dh_out = self.conns[name].my_privk.exchange(ec.ECDH(), self.conns[name].their_pk)
+            # self.conns[name].rk, self.conns[name].my_pubk , self.conns[name].my_privk= self.dhRatchet(self.conns[name].pk, self.conns[name].rk)
+            # self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.root)
+            self.conns[name].rk, self.conns[name].ck = self.dhRatchet(self.conns[name].rk, dh_out)
 
-            self.conns[name].rk, self.conns[name].my_pubk , self.conns[name].my_privk= self.dhRatchet(self.conns[name].pk, self.conns[name].rk)
-            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.root)
+            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.conns[name].ck)
+            
 
             #encrypt
             
             #DH ratchet and symm
         else:
             #NO DH ratchet, but symm ratchet
-            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.mk)
+            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.conns[name].ck)
 
             #encrypt
             
@@ -103,7 +97,6 @@ class MessengerClient:
         head = Header(self.conns[name].my_pubk, self.counter)
         
         a = AESGCM(self.conns[name].mk)
-        print(self.conns[name].mk)
         c = a.encrypt(nonce=bytes(str(self.counter), 'ascii'), data=bytes(message, 'ascii'), associated_data=self.conns[name].my_pubk.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
         
         return head, c
@@ -116,7 +109,7 @@ class MessengerClient:
 
         #first time receiving
         if name not in self.conns:
-            
+            self.sending[name] = False
             # dh_out = self.private_key.exchange(ec.ECDH(), header.pk)
 
             dh_out = self.certs[name][0]
@@ -129,27 +122,29 @@ class MessengerClient:
 
         elif self.conns[name].their_pk != header.pk:
             self.sending[name] = False
+            #private_key = ec.generate_private_key(ec.SECP256K1())
+            #public_key = private_key.public_key()
+            #self.conns[name].my_pubk = public_key
+            #self.conns[name].my_privk = private_key
+            self.conns[name].their_pk = header.pk
 
             dh_out = self.conns[name].my_privk.exchange(ec.ECDH(), header.pk)
+            self.conns[name].rk, self.conns[name].ck = self.dhRatchet(self.conns[name].rk, dh_out)
 
-            self.conns[name].rk, ck = self.dhRatchet(self.conns[name].rk, dh_out)
-
-            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(ck)
+            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.conns[name].ck)
+            
         else:
-            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.mk)
+            self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.conns[name].ck)
         
         
         a = AESGCM(self.conns[name].mk)
-        print(self.conns[name].mk)
-        message = a.decrypt(nonce=bytes(str(header.nonce), 'ascii'), data=ciphertext,associated_data=header.pk.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
-        
-        
-        return message
+        try:
+            message = a.decrypt(nonce=bytes(str(header.nonce), 'ascii'), data=ciphertext,associated_data=header.pk.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+        except:
+            return None
+        return str(message,encoding='utf-8')
          
         #first check if we were receiving before, if not them self.sending[name] = False ELSE don't change it because it's already false
-
-        raise Exception("not implemented!")
-        return
 
     def report(self, name, message):
         raise Exception("not implemented!")
@@ -165,7 +160,7 @@ class MessengerClient:
         return root_key, chain_key
 
     def symmRatchet(self, chain_key):
-        h = hmac.HMAC(chain_key, hashes.SHA256())
+        h = hmac.HMAC(bytes(chain_key), hashes.SHA256())
 
         h.update(b"0x02")
 

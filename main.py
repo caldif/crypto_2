@@ -63,38 +63,53 @@ else:
 print("Testing a conversation")
 header, ct = alice.sendMessage("bob", "Hi Bob!")
 msg = bob.receiveMessage("alice", header, ct)
+
 if msg != "Hi Bob!":
     error("message 1 was not decrypted correctly")
+else:
+    print("works")
 
 header, ct = alice.sendMessage("bob", "Hi again Bob!")
 msg = bob.receiveMessage("alice", header, ct)
 if msg != "Hi again Bob!":
     error("message 2  was not decrypted correctly")
+else:
+    print("work 2")
 
 header, ct = bob.sendMessage("alice", "Hey Alice!")
 msg = alice.receiveMessage("bob", header, ct)
 if msg != "Hey Alice!":
     error("message 3 was not decrypted correctly")
+else:
+    print("work 3")
 
 header, ct = bob.sendMessage("alice", "Can't talk now")
 msg = alice.receiveMessage("bob", header, ct)
 if msg != "Can't talk now":
     error("message 4 was not decrypted correctly")
+else:
+    print("work 4")
 
 header, ct = bob.sendMessage("alice", "Started the homework too late :(")
 msg = alice.receiveMessage("bob", header, ct)
 if msg != "Started the homework too late :(":
     error("message 5 was not decrypted correctly")
+else:
+    print("work 5")
 
 header, ct = alice.sendMessage("bob", "Ok, bye Bob!")
 msg = bob.receiveMessage("alice", header, ct)
 if msg != "Ok, bye Bob!":
     error("message 6  was not decrypted correctly")
+else:
+    print("work 6")
 
 header, ct = bob.sendMessage("alice", "I'll remember to start early next time!")
 msg = alice.receiveMessage("bob", header, ct)
 if msg != "I'll remember to start early next time!":
     error("message 7 was not decrypted correctly")
+else:
+    print("work 8")
 
 print("conversation completed!")
 
