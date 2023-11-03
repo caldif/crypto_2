@@ -40,10 +40,7 @@ class MessengerClient:
         self.sending = {} #stores name of person talking to with a boolean of whether you sent the last message (true if it was you)
         self.private_key = None
         
-        #These need to be fixed because there's one for each convo
-        self.mk = None
-        self.root = None
-        self.chain = None
+        
         self.counter = 2**64
         self.reoprt_counter = 2**64
 
@@ -75,7 +72,6 @@ class MessengerClient:
             self.conns[name] = Keys(self.certs[name][1],ck,mk,rk, self.private_key.public_key(),self.private_key)
 
 
-        #     #my public key should go in the header             
         elif self.sending[name] is False:
             self.sending[name] = True
 
@@ -86,21 +82,17 @@ class MessengerClient:
             self.conns[name].my_privk = private_key
 
             dh_out = self.conns[name].my_privk.exchange(ec.ECDH(), self.conns[name].their_pk)
-            # self.conns[name].rk, self.conns[name].my_pubk , self.conns[name].my_privk= self.dhRatchet(self.conns[name].pk, self.conns[name].rk)
-            # self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.root)
+
             self.conns[name].rk, self.conns[name].ck = self.dhRatchet(self.conns[name].rk, dh_out)
 
             self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.conns[name].ck)
             
 
-            #encrypt
-            
-            #DH ratchet and symm
+
         else:
             #NO DH ratchet, but symm ratchet
             self.conns[name].ck, self.conns[name].mk = self.symmRatchet(self.conns[name].ck)
 
-            #encrypt
             
         self.counter +=1    
         head = Header(self.conns[name].my_pubk, self.counter)
@@ -112,12 +104,10 @@ class MessengerClient:
 
     def receiveMessage(self, name, header, ciphertext):
 
-        # self.conns[name] = header #loading this in
 
         #first time receiving
         if name not in self.conns:
             self.sending[name] = False
-            # dh_out = self.private_key.exchange(ec.ECDH(), header.pk)
 
             dh_out = self.certs[name][0]
 
@@ -129,10 +119,7 @@ class MessengerClient:
 
         elif self.conns[name].their_pk != header.pk:
             self.sending[name] = False
-            #private_key = ec.generate_private_key(ec.SECP256K1())
-            #public_key = private_key.public_key()
-            #self.conns[name].my_pubk = public_key
-            #self.conns[name].my_privk = private_key
+
             self.conns[name].their_pk = header.pk
 
             dh_out = self.conns[name].my_privk.exchange(ec.ECDH(), header.pk)
@@ -151,7 +138,6 @@ class MessengerClient:
             return None
         return str(message,encoding='utf-8')
          
-        #first check if we were receiving before, if not them self.sending[name] = False ELSE don't change it because it's already false
 
     def report(self, name, message):
         y = ec.generate_private_key(ec.SECP256R1())
